@@ -1,8 +1,10 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 module Main where
 
 
+import Prelude (IO, Maybe(..), Integer, show, (.), ($), (<$>), (/=))
 import Web.Twitter.Conduit
 import qualified Web.Twitter.Conduit.Parameters as P
 import Web.Twitter.Types.Lens
