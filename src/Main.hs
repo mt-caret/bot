@@ -22,21 +22,21 @@ import System.Environment
 
 getTWInfo :: IO TWInfo
 getTWInfo = do
-  consumerKey <- getEnv' "OAUTH_CONSUMER_KEY"
-  consumerSecret <- getEnv' "OAUTH_CONSUMER_SECRET"
-  accessToken <- getEnv' "OAUTH_TOKEN"
-  accessSecret <- getEnv' "OAUTH_TOKEN_SECRET"
-  let oauth = twitterOAuth
-          { oauthConsumerKey = consumerKey
-          , oauthConsumerSecret = consumerSecret
-          }
-      cred = Credential
-          [ ("oauth_token", accessToken)
-          , ("oauth_token_secret", accessSecret)
-          ]
-  return $ setCredential oauth cred def
-  where
-    getEnv' str = S8.pack <$> (getEnv str)
+    consumerKey <- getEnv' "OAUTH_CONSUMER_KEY"
+    consumerSecret <- getEnv' "OAUTH_CONSUMER_SECRET"
+    accessToken <- getEnv' "OAUTH_TOKEN"
+    accessSecret <- getEnv' "OAUTH_TOKEN_SECRET"
+    let oauth = twitterOAuth
+            { oauthConsumerKey = consumerKey
+            , oauthConsumerSecret = consumerSecret
+            }
+        cred = Credential
+            [ ("oauth_token", accessToken)
+            , ("oauth_token_secret", accessSecret)
+            ]
+    return $ setCredential oauth cred def
+    where
+      getEnv' str = S8.pack <$> (getEnv str)
 
 
 getManager :: IO Manager
