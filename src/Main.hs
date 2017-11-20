@@ -51,23 +51,27 @@ reply text id = update text & P.inReplyToStatusId ?~ id
 
 
 escape :: T.Text -> T.Text -> T.Text
-escape screenName = T.strip . T.replace "@" "" . T.replace ("@" <> screenName) " "
+escape sn = T.strip . T.replace "@" "" . T.replace ("@" <> sn) " "
 -- replacing with " " to prevent stuff like @al@bobice -> @alice
 
 
 sink :: TWInfo -> Manager -> T.Text -> Consumer Status (ResourceT IO) ()
-sink twInfo mgr screenName =
-    CL.mapM_ $ \status -> liftIO $ do
-        let id = status ^. statusId
-        let echoText = escape screenName $ status ^. statusText
-        let content = "@" <> status ^. statusUser . userScreenName <> " " <> echoText
+sink twInfo mgr sn =
+    CL.mapM_ $ \st -> liftIO $ do
+        let id = st ^. statusId
+        let echoText = escape sn $ st ^. statusText
+        let content
+                = ".@"
+                <> st ^. statusUser . userScreenName
+                <> " "
+                <> echoText
         _ <- call twInfo mgr $ reply content id
         T.putStrLn
-            $ (T.pack . show $ status ^. statusId)
+            $ (T.pack . show $ st ^. statusId)
             <> ": "
-            <> status ^. statusUser . userScreenName
+            <> st ^. statusUser . userScreenName
             <> ": "
-            <> status ^. statusText
+            <> st ^. statusText
 
 
 getOwnScreenName :: TWInfo -> Manager -> IO T.Text
@@ -85,13 +89,13 @@ main :: IO ()
 main = do
     twInfo <- getTWInfo
     mgr <- getManager
-    screenName <- getOwnScreenName twInfo mgr
-    T.putStrLn $ "I'm " <> screenName
+    sn <- getOwnScreenName twInfo mgr
+    T.putStrLn $ "I'm " <> sn
     runResourceT $ do
         rsrc <- stream twInfo mgr userstream
         rsrc
             $$+- CL.mapMaybe extractStatuses
-            .| CL.filter (\status -> screenName /= status ^. statusUser . userScreenName)
-            .| sink twInfo mgr screenName
+            .| CL.filter (\st -> sn /= st ^. statusUser . userScreenName)
+            .| sink twInfo mgr sn
 
 
