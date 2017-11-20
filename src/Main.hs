@@ -18,6 +18,7 @@ import Control.Concurrent
 import Control.Monad
 import Control.Monad.Trans.Resource
 import System.Environment
+import Data.Monoid ((<>))
 
 
 getTWInfo :: IO TWInfo
@@ -48,7 +49,7 @@ reply text id = update text & P.inReplyToStatusId ?~ id
 
 
 escape :: T.Text -> T.Text -> T.Text
-escape screenName = T.strip . T.replace "@" "" . T.replace (T.concat ["@", screenName]) " "
+escape screenName = T.strip . T.replace "@" "" . T.replace ("@" <> screenName) " "
 -- replacing with " " to prevent stuff like @al@bobice -> @alice
 
 
@@ -57,15 +58,14 @@ sink twInfo mgr screenName =
     CL.mapM_ $ \status -> liftIO $ do
         let id = status ^. statusId
         let echoText = escape screenName $ status ^. statusText
-        let content = T.concat ["@", status ^. statusUser . userScreenName, " ", echoText]
+        let content = "@" <> status ^. statusUser . userScreenName <> " " <> echoText
         _ <- call twInfo mgr $ reply content id
-        T.putStrLn $ T.concat
-            [ T.pack . show $ status ^. statusId
-            , ": "
-            , status ^. statusUser . userScreenName
-            , ": "
-            , status ^. statusText
-            ]
+        T.putStrLn
+            $ (T.pack . show $ status ^. statusId)
+            <> ": "
+            <> status ^. statusUser . userScreenName
+            <> ": "
+            <> status ^. statusText
 
 
 getOwnScreenName :: TWInfo -> Manager -> IO T.Text
@@ -84,7 +84,7 @@ main = do
     twInfo <- getTWInfo
     mgr <- getManager
     screenName <- getOwnScreenName twInfo mgr
-    T.putStrLn $ T.concat ["I'm ", screenName]
+    T.putStrLn $ "I'm " <> screenName
     runResourceT $ do
         rsrc <- stream twInfo mgr userstream
         rsrc
