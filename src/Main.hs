@@ -4,7 +4,22 @@
 module Main where
 
 
-import Prelude (IO, Maybe(..), Integer, show, (.), ($), (<$>), (/=))
+import Prelude
+    (IO
+    , Maybe(..)
+    , Integer
+    , FilePath
+    , String
+    , show
+    , length
+    , print
+    , undefined
+    , (.)
+    , ($)
+    , (<$>)
+    , (==)
+    , (/=)
+    )
 import Web.Twitter.Conduit
 import qualified Web.Twitter.Conduit.Parameters as P
 import Web.Twitter.Types.Lens
@@ -21,6 +36,9 @@ import Control.Monad
 import Control.Monad.Trans.Resource
 import System.Environment
 import Data.Monoid ((<>))
+import Data.Maybe
+import qualified Turtle as TT
+import qualified Control.Foldl as Fold
 
 
 getTWInfo :: IO TWInfo
@@ -45,14 +63,45 @@ getTWInfo = do
 getManager :: IO Manager
 getManager = newManager tlsManagerSettings
 
-
 reply :: T.Text -> Integer -> APIRequest StatusesUpdate Status
 reply text id = update text & P.inReplyToStatusId ?~ id
 
+replyWithMedia :: T.Text -> Integer -> FilePath -> APIRequest StatusesUpdateWithMedia Status
+replyWithMedia text id fp =
+    updateWithMedia text (MediaFromFile fp) & P.inReplyToStatusId ?~ id
 
 escape :: T.Text -> T.Text -> T.Text
 escape sn = T.strip . T.replace "@" "" . T.replace ("@" <> sn) " "
 -- replacing with " " to prevent stuff like @al@bobice -> @alice
+
+
+downloadFromURL :: [T.Text] -> IO [FilePath]
+downloadFromURL urls =
+    (fmap show) <$> TT.fold shellCmd Fold.list
+    where
+      shellCmd = do
+        dir <- TT.using (TT.mktempdir "/tmp" "bot")
+        TT.cd dir
+        forM_ urls $ \url -> TT.inproc "wget" [url] TT.empty
+        TT.ls dir
+
+
+extractMediaURLs :: Status -> [T.Text]
+extractMediaURLs st =
+    let
+        getURL med = med ^. entityBody . meMediaURLHttps
+        extract ents = ents ^. enMedia ^.to (fmap getURL)
+    in
+        fromMaybe [] $ st ^. statusEntities ^.to (fmap extract)
+
+
+toString :: Status -> T.Text
+toString st =
+    (T.pack . show $ st ^. statusId)
+        <> ": "
+        <> st ^. statusUser . userScreenName
+        <> ": "
+        <> st ^. statusText
 
 
 sink :: TWInfo -> Manager -> T.Text -> Consumer Status (ResourceT IO) ()
@@ -65,13 +114,13 @@ sink twInfo mgr sn =
                 <> st ^. statusUser . userScreenName
                 <> " "
                 <> echoText
-        _ <- call twInfo mgr $ reply content id
-        T.putStrLn
-            $ (T.pack . show $ st ^. statusId)
-            <> ": "
-            <> st ^. statusUser . userScreenName
-            <> ": "
-            <> st ^. statusText
+        fps <- downloadFromURL . extractMediaURLs $ st
+        res <- case fps of
+            [] -> call twInfo mgr $ reply content id
+            fp:_ -> call twInfo mgr $ replyWithMedia content id fp
+--        _ <- call twInfo mgr $ reply content id
+        T.putStrLn . toString $ st
+        T.putStrLn $ "> " <> toString res
 
 
 getOwnScreenName :: TWInfo -> Manager -> IO T.Text

@@ -21,6 +21,8 @@ executable bot
                      , authenticate-oauth
                      , bytestring
                      , text
+                     , turtle
+                     , foldl
                      , conduit
                      , time
                      , lens
