@@ -6,7 +6,7 @@ homepage:            https://github.com/mt-caret/bot
 license:             BSD3
 license-file:        LICENSE
 author:              Masayuki Takeda
-maintainer:          Masayuki Takeda
+maintainer:          mtakeda.enigsol@gmail.com
 copyright:           2017 Masayuki Takeda
 category:            Web
 build-type:          Simple
