@@ -46,6 +46,7 @@ import Data.Monoid ((<>))
 import Data.Maybe
 import qualified Turtle as TT
 import qualified Control.Foldl as Fold
+import System.FilePath
 
 
 getTWInfo :: IO TWInfo
@@ -117,18 +118,14 @@ sink twInfo mgr sn =
       let
         processStatus = do
             let id = st ^. statusId
-            let echoText = escape sn $ st ^. statusText
-            let content
-                    = ".@"
-                    <> st ^. statusUser . userScreenName
-                    <> " "
-                    <> echoText
             fps <- downloadFromURL . extractMediaURLs $ st
-            res <- case fps of
-                [] -> call twInfo mgr $ reply content id
-                fp:_ -> call twInfo mgr $ replyWithMedia content id fp
-            T.putStrLn . toString $ st
-            T.putStrLn $ "> " <> toString res
+            case fps of
+                [] -> return ()
+                fp:_ -> do
+                    (code, out) <- TT.shellStrict ("python /bin/eval.py " <> (T.pack fp)) TT.empty
+                    res <- call twInfo mgr $ replyWithMedia out id $ fp ++ (takeExtension fp)
+                    T.putStrLn . toString $ st
+                    T.putStrLn $ "> " <> toString res
       in
         liftIO $ processStatus `catchError` errorHandler
 

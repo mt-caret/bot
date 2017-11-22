@@ -24,6 +24,7 @@ executable bot
                      , text
                      , turtle
                      , foldl
+                     , filepath
                      , conduit
                      , time
                      , lens
