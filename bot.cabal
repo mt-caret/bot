@@ -20,6 +20,7 @@ executable bot
   build-depends:       base >= 4.7 && < 5
                      , authenticate-oauth
                      , bytestring
+                     , unbounded-delays
                      , text
                      , turtle
                      , foldl

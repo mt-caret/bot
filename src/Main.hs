@@ -22,6 +22,8 @@ import Prelude
     , (==)
     , (/=)
     , (++)
+    , (*)
+    , (^)
     )
 import Web.Twitter.Conduit
 import qualified Web.Twitter.Conduit.Parameters as P
@@ -35,6 +37,7 @@ import Control.Monad.IO.Class
 import Control.Lens
 import Data.Time
 import Control.Concurrent
+import Control.Concurrent.Thread.Delay
 import Control.Monad
 import Control.Monad.Trans.Resource
 import Control.Monad.Except as E
@@ -161,6 +164,9 @@ main = do
     mgr <- getManager
     sn <- getOwnScreenName twInfo mgr
     T.putStrLn $ "I'm " <> sn
-    streamTweets twInfo mgr sn
+    forM_ [0..] $ \n -> do
+        streamTweets twInfo mgr sn
+        putStrLn $ "ERROR> Something terrible happened. (" ++ (show n) ++ ")"
+        delay (2^n * 1000 * 1000) -- exponential backoff
 
 
