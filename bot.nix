@@ -1,6 +1,6 @@
 { mkDerivation, authenticate-oauth, base, bytestring, conduit
-, foldl, lens, resourcet, stdenv, text, time, turtle
-, twitter-conduit, twitter-types-lens
+, foldl, lens, mtl, resourcet, stdenv, text, time, turtle
+, twitter-conduit, twitter-types-lens, unbounded-delays
 }:
 mkDerivation {
   pname = "bot";
@@ -9,8 +9,9 @@ mkDerivation {
   isLibrary = false;
   isExecutable = true;
   executableHaskellDepends = [
-    authenticate-oauth base bytestring conduit foldl lens resourcet
+    authenticate-oauth base bytestring conduit foldl lens mtl resourcet
     text time turtle twitter-conduit twitter-types-lens
+    unbounded-delays
   ];
   homepage = "https://github.com/mt-caret/bot";
   license = stdenv.lib.licenses.bsd3;
