@@ -27,5 +27,6 @@ executable bot
                      , time
                      , lens
                      , resourcet
+                     , mtl
                      , twitter-types-lens
                      , twitter-conduit

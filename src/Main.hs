@@ -8,17 +8,20 @@ import Prelude
     (IO
     , Maybe(..)
     , Integer
+    , Show
     , FilePath
     , String
     , show
     , length
     , print
+    , putStrLn
     , undefined
     , (.)
     , ($)
     , (<$>)
     , (==)
     , (/=)
+    , (++)
     )
 import Web.Twitter.Conduit
 import qualified Web.Twitter.Conduit.Parameters as P
@@ -34,6 +37,7 @@ import Data.Time
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.Trans.Resource
+import Control.Monad.Except as E
 import System.Environment
 import Data.Monoid ((<>))
 import Data.Maybe
@@ -56,8 +60,8 @@ getTWInfo = do
             , ("oauth_token_secret", accessSecret)
             ]
     return $ setCredential oauth cred def
-    where
-      getEnv' str = S8.pack <$> (getEnv str)
+  where
+    getEnv' str = S8.pack <$> (getEnv str)
 
 
 getManager :: IO Manager
@@ -78,12 +82,12 @@ escape sn = T.strip . T.replace "@" "" . T.replace ("@" <> sn) " "
 downloadFromURL :: [T.Text] -> IO [FilePath]
 downloadFromURL urls =
     (fmap show) <$> TT.fold shellCmd Fold.list
-    where
-      shellCmd = do
-        dir <- TT.using (TT.mktempdir "/tmp" "bot")
-        TT.cd dir
-        forM_ urls $ \url -> TT.inproc "wget" [url] TT.empty
-        TT.ls dir
+  where
+    shellCmd = do
+      dir <- TT.using (TT.mktempdir "/tmp" "bot")
+      TT.cd dir
+      forM_ urls $ \url -> TT.inproc "wget" [url] TT.empty
+      TT.ls dir
 
 
 extractMediaURLs :: Status -> [T.Text]
@@ -106,22 +110,24 @@ toString st =
 
 sink :: TWInfo -> Manager -> T.Text -> Consumer Status (ResourceT IO) ()
 sink twInfo mgr sn =
-    CL.mapM_ $ \st -> liftIO $ do
-        let id = st ^. statusId
-        let echoText = escape sn $ st ^. statusText
-        let content
-                = ".@"
-                <> st ^. statusUser . userScreenName
-                <> " "
-                <> echoText
-        fps <- downloadFromURL . extractMediaURLs $ st
-        res <- case fps of
-            [] -> call twInfo mgr $ reply content id
-            fp:_ -> call twInfo mgr $ replyWithMedia content id fp
---        _ <- call twInfo mgr $ reply content id
-        T.putStrLn . toString $ st
-        T.putStrLn $ "> " <> toString res
-
+    CL.mapM_ $ \st ->
+      let
+        processStatus = do
+            let id = st ^. statusId
+            let echoText = escape sn $ st ^. statusText
+            let content
+                    = ".@"
+                    <> st ^. statusUser . userScreenName
+                    <> " "
+                    <> echoText
+            fps <- downloadFromURL . extractMediaURLs $ st
+            res <- case fps of
+                [] -> call twInfo mgr $ reply content id
+                fp:_ -> call twInfo mgr $ replyWithMedia content id fp
+            T.putStrLn . toString $ st
+            T.putStrLn $ "> " <> toString res
+      in
+        liftIO $ processStatus `catchError` errorHandler
 
 getOwnScreenName :: TWInfo -> Manager -> IO T.Text
 getOwnScreenName twInfo mgr = do
@@ -134,17 +140,27 @@ extractStatuses (SStatus s) = Just s
 extractStatuses _ = Nothing
 
 
+errorHandler :: Show e => e -> IO ()
+errorHandler e = putStrLn $ "ERROR> " ++ show e
+
+
+streamTweets :: TWInfo -> Manager -> T.Text -> IO ()
+streamTweets twInfo mgr sn =
+    E.catchError streamTweets' errorHandler
+  where
+    streamTweets' = runResourceT $ do
+        rsrc <- stream twInfo mgr userstream
+        rsrc
+            $$+- CL.mapMaybe extractStatuses
+            .| CL.filter (\st -> sn /= st ^. statusUser . userScreenName)
+            .| sink twInfo mgr sn
+
 main :: IO ()
 main = do
     twInfo <- getTWInfo
     mgr <- getManager
     sn <- getOwnScreenName twInfo mgr
     T.putStrLn $ "I'm " <> sn
-    runResourceT $ do
-        rsrc <- stream twInfo mgr userstream
-        rsrc
-            $$+- CL.mapMaybe extractStatuses
-            .| CL.filter (\st -> sn /= st ^. statusUser . userScreenName)
-            .| sink twInfo mgr sn
+    streamTweets twInfo mgr sn
 
 
