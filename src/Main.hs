@@ -45,6 +45,7 @@ import System.Environment
 import Data.Monoid ((<>))
 import Data.Maybe
 import qualified Turtle as TT
+import qualified Turtle.Format as TF
 import qualified Control.Foldl as Fold
 import System.FilePath
 
@@ -83,15 +84,13 @@ escape sn = T.strip . T.replace "@" "" . T.replace ("@" <> sn) " "
 -- replacing with " " to prevent stuff like @al@bobice -> @alice
 
 
-downloadFromURL :: [T.Text] -> IO [FilePath]
-downloadFromURL urls =
-    (fmap show) <$> TT.fold shellCmd Fold.list
-  where
-    shellCmd = do
-      dir <- TT.using (TT.mktempdir "/tmp" "bot")
-      TT.cd dir
-      forM_ urls $ \url -> TT.inproc "wget" [url] TT.empty
-      TT.ls dir
+downloadFromURL :: [T.Text] -> IO ()
+downloadFromURL urls = TT.sh $ do
+    TT.rmtree "/tmp/bot"
+    TT.mktree "/tmp/bot"
+    TT.cd "/tmp/bot"
+    forM_ urls $ \url -> TT.inproc "wget" [url] TT.empty
+    TT.cd "/tmp"
 
 
 extractMediaURLs :: Status -> [T.Text]
@@ -111,6 +110,8 @@ toString st =
         <> ": "
         <> st ^. statusText
 
+conv :: TT.FilePath -> String
+conv fp = T.unpack (TF.format TF.fp fp)
 
 sink :: TWInfo -> Manager -> T.Text -> Consumer Status (ResourceT IO) ()
 sink twInfo mgr sn =
@@ -118,12 +119,23 @@ sink twInfo mgr sn =
       let
         processStatus = do
             let id = st ^. statusId
-            fps <- downloadFromURL . extractMediaURLs $ st
-            case fps of
+            downloadFromURL . extractMediaURLs $ st
+            fps <- TT.fold (TT.ls "/tmp/bot") Fold.list
+            putStrLn . show $ fps
+            case conv <$> fps of
                 [] -> return ()
                 fp:_ -> do
-                    (code, out) <- TT.shellStrict ("python /bin/eval.py " <> (T.pack fp)) TT.empty
-                    res <- call twInfo mgr $ replyWithMedia out id $ fp ++ (takeExtension fp)
+                    putStrLn $ "filepath: " ++ fp
+                    TT.sh $ TT.cd "~/bot"
+                    (code, out) <- TT.shellStrict ("python src/eval.py" <> (T.pack fp)) TT.empty
+                    let content
+                          = ".@"
+                          <> st ^. statusUser . userScreenName
+                          <> " "
+                          <> out
+                    res <- call twInfo mgr $ replyWithMedia content id $ fp ++ (takeExtension fp)
+--                    res <- call twInfo mgr $ replyWithMedia content id fp
+--                    res <- call twInfo mgr $ replyWithMedia content id fp
                     T.putStrLn . toString $ st
                     T.putStrLn $ "> " <> toString res
       in
